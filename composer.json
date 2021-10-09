@@ -1,0 +1,20 @@
+{
+    "name": "tuhra/uabpay",
+    "description": "UAB payment",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Tuhra\\Uabpay\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Tuhra\\Uabpay\\UabPayServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "dev",
+    "require": {}
+}

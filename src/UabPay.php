@@ -2,43 +2,31 @@
 
 namespace Tuhra\Uabpay;
 
+use Tuhra\Uabpay\Model\Invoice;
+use Tuhra\Uabpay\Model\UabLog;
+
 class UabPay
 {
-	/* UAB Credentials Start */
-	// define('UAB_KEY', 'FDB13EB47FA9');
-	// define('UAB_USERNAME', 'UABMM202048030548275411563');
-	// define('UAB_PASSWORD', 'admin@2020');
-	// define('UAB_CHANNEL', 'TRUST OO');
-	// define('UAB_MERCHENTUSERID', 'UABMM202048030548275411563');
-	// define('UAB_APPNAME', 'saisaipay');
-	// define('UAB_AMOUNT', '200');
-	// define('UAB_CALLBACK', 'http://157.230.254.63/uab/callback');
-	// define('UAB_EXIPRE', '180');
-	// define('UAB_LOGIN_URL', 'http://webapi.uatuab.com:8080/API/Ver01/Wallet/Wallet_Login');
-	// define('UAB_MSISDN_URL', 'http://webapi.uatuab.com:8080/API/Ver03/Wallet/Wallet_CheckPhoneNoAPIV3');
-	// define('UAB_PAYMENT_URL', 'http://webapi.uatuab.com:8080/API/Ver01/Wallet/Wallet_PaymentAPI');
-	/* UAB Credentials End */
-
-	public function encrypted($string) {
+	public static function encrypted($string) {
 		$hash = hash_hmac('sha1', $string, config('uab.uab_key') , false);
 		return strtoupper($hash);
 	}
 
-	public function uabLogin() {
+	public static function generateToken() {
 		$data = [
 			"UserName" => config('uab.uab_user'),
 			"Password" => config('uab.uab_password')
 		];
 
         $data = json_encode($data);
-		$result = $this->postapirequest(config('uab.uab_login_url'), $data);
-		$json = $result['res'];
-		return json_decode($json, TRUE);
+		$result = self::postapirequest(config('uab.uab_login_url'), $data);
+		$token_array = json_decode($result['res'], true);
+		return $token_array['Token'];
 	}
 
-	public function checkUabMsisdn($msisdn, $token) {
+	public static function checkUabMsisdn($msisdn, $token) {
 		$string = config('uab.uab_channel') . config('uab.uab_merchant_userid') . config('uab.uab_app_name') . $msisdn;
-		$hash = $this->encrypted($string);
+		$hash = self::encrypted($string);
 		$data = [
 			'Channel' => config('uab.uab_channel'),
 			'MerchantUserId' => config('uab.uab_merchant_userid'),
@@ -47,18 +35,18 @@ class UabPay
 			'HashValue' => $hash
 		];
         $data = json_encode($data);
-		$result = $this->postapirequest(config('uab.uab_msisdn_url'), $data, $token);
+		$result = self::postapirequest(config('uab.uab_msisdn_url'), $data, $token);
 		$json = $result['res'];
 		return json_decode($json, TRUE);
 
 	}
 
-	public function paymentAPI($msisdn, $token) {
-		$invoice = $this->getInvoiceNo();
-		$sequenceNo = $this->getSequenceNo();
+	public static function paymentAPI($msisdn, $token) {
+		$invoice = self::getInvoiceNo();
+		$sequenceNo = self::getSequenceNo();
 		$remark = config('uab.uab_remark');
-		$string = config('uab.uab_channel') . config('uab.uab_app_name') . config('uab.uab_merchant_userid') . $msisdn . '200' . $remark . $invoice . $sequenceNo . config('uab.uab_callback') . config('uab.uab_expire');
-		$hash = $this->encrypted($string);
+		$string = config('uab.uab_channel') . config('uab.uab_app_name') . config('uab.uab_merchant_userid') . $msisdn . config('uab.uab_amount') . $remark . $invoice . $sequenceNo . config('uab.uab_callback') . config('uab.uab_expire');
+		$hash = self::encrypted($string);
 
 		$data = [
 			'Channel' => config('uab.uab_channel'),
@@ -74,8 +62,8 @@ class UabPay
 			'HashValue' => $hash
 		];
         $data = json_encode($data);
-		$result = $this->postapirequest(config('uab.uab_payment_url'), $data, $token);
-		// uablogcreation($sequenceNo, $result['req'], $result['res']);
+		$result = self::postapirequest(config('uab.uab_payment_url'), $data, $token);
+		self::uablogcreation($sequenceNo, $result['req'], $result['res']);
 		return $result['res'];
 	}
 
@@ -103,7 +91,7 @@ class UabPay
 	}
 
 
-	private function postapirequest($url, $data, $token=null) {
+	public static function postapirequest($url, $data, $token=null) {
 
 		$header = array(
 		    'Accept: application/json',
@@ -136,23 +124,33 @@ class UabPay
 	}
 
 
-	private function getInvoiceNo() {
-		// $invoice = Invoice::orderby('id', 'DESC')->first();
-		// $i = 1;
-		// if ($invoice) {
-		// 	$i = $invoice->id + 1;
-		// }
-		// $invNo = 'HEALTHCARE' . str_pad($i, 5, "0", STR_PAD_LEFT);
-		// $row = new Invoice;
-		// $row->invoice = $invNo;
-		// $row->save();
-		// return $invNo;
-		return 'HEALTHCARESEQUENCENO' . rand(100,999).time().rand(100,999);
+	public static function getInvoiceNo() {
+		$invoice = Invoice::orderby('id', 'DESC')->first();
+		$i = 1;
+		if ($invoice) {
+			$i = $invoice->id + 1;
+		}
+		$invNo = config('uab.uab_invoice_prefix') . str_pad($i, 5, "0", STR_PAD_LEFT);
+		$row = new Invoice;
+		$row->invoice = $invNo;
+		$row->save();
+		return $invNo;
 	}
 
-	private function getSequenceNo() {
-		return 'HEALTHCARESEQUENCENO' . rand(100,999).time().rand(100,999);
+	public static function getSequenceNo() {
+		return config('uab.uab_seq_prefix') . rand(100,999).time().rand(100,999);
+	}
+
+	public static function uablogcreation($seqNo, $req, $res) {
+		$log = new UabLog;
+		$log->SequenceNo = $seqNo;
+		$log->reqBody = $req;
+		$log->resBody = $res;
+		$log->save();
 	}
 
 
 }
+
+
+

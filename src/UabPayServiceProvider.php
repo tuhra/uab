@@ -25,6 +25,12 @@ class UabPayServiceProvider extends ServiceProvider
     {
         $this->publishes([
             __DIR__.'/../config/uab.php' => config_path('uab.php'),
-        ]);
+        ], 'uab-config');
+
+        $this->publishes([
+            __DIR__.'/../migrations/' => database_path('migrations'),
+        ], 'uab-migration');
+
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
     }
 }
